@@ -197,7 +197,7 @@ function gameLoop() {
 function renderFrame(memoryView) {
     const w = memoryView.getUint32(sysOffset + 0, true);
     const h = memoryView.getUint32(sysOffset + 4, true);
-    const vramPtr = 296; // sizeof(SystemConfig)
+    const vramPtr = sysOffset + 296; // sizeof(SystemConfig)
 
     // Create or reuse ImageData
     if (!imageDataCache || imageDataCache.width !== w || imageDataCache.height !== h) {
