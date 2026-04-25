@@ -137,17 +137,14 @@ function startEngine() {
         wasmInstance.exports.papagaio_init();
     }
 
-    // Get system config ptr (predictable layout or dynamic)
+    // Get system config ptr (predictable layout)
     sysOffset = 0;
-    if (wasmInstance.exports.get_system_config) {
-        sysOffset = wasmInstance.exports.get_system_config();
-    }
 
     // Check memory requirements and grow if necessary (replicating host.c)
     const dv = new DataView(wasmMemory.buffer);
     const ram = dv.getUint32(sysOffset + 8, true);
     const vram = dv.getUint32(sysOffset + 12, true);
-    const vramPtr = sysOffset + 296; // sizeof(SystemConfig)
+    const vramPtr = 296; // sizeof(SystemConfig)
     const ramPtr = vramPtr + vram;
     const totalNeeded = ramPtr + ram;
     const requiredPages = Math.ceil(totalNeeded / 65536);
@@ -197,7 +194,7 @@ function gameLoop() {
 function renderFrame(memoryView) {
     const w = memoryView.getUint32(sysOffset + 0, true);
     const h = memoryView.getUint32(sysOffset + 4, true);
-    const vramPtr = sysOffset + 296; // sizeof(SystemConfig)
+    const vramPtr = 296; // sizeof(SystemConfig)
 
     // Create or reuse ImageData
     if (!imageDataCache || imageDataCache.width !== w || imageDataCache.height !== h) {

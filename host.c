@@ -150,16 +150,11 @@ int main(int argc, char** argv) {
     m3_CallV(fn_init);
 
     uint32_t sys_wasm_offset = 0;
-    IM3Function fn_get_sys;
-    if (m3_FindFunction(&fn_get_sys, runtime, "get_system_config") == m3Err_none) {
-        m3_CallV(fn_get_sys);
-        m3_GetResultsV(fn_get_sys, &sys_wasm_offset);
-    }
 
     uint8_t* mem = m3_GetMemory(runtime, NULL, 0);
     SystemConfig* sys = (SystemConfig*)(mem + sys_wasm_offset);
 
-    uint32_t vram_ptr = sys_wasm_offset + sizeof(SystemConfig);
+    uint32_t vram_ptr = sizeof(SystemConfig);
     uint32_t ram_ptr = vram_ptr + sys->vram;
     uint32_t total_needed = ram_ptr + sys->ram;
 

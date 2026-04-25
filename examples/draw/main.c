@@ -60,20 +60,16 @@ void int_to_str(int n, char* str) {
     }
 }
 
-__attribute__((visibility("default")))
-void* get_system_config(void) {
-    return (void*)&__heap_base;
-}
 
 void papagaio_init(void) {
-    _sys = (SystemConfig*)&__heap_base;
+    _sys = (SystemConfig*)0;
 
     _sys->width  = 320;
     _sys->height = 240;
     _sys->vram   = 320 * 240 * 2;
     _sys->ram    = 1024 * 512;
 
-    _fb = (uint16_t*)((uint32_t)&__heap_base + sizeof(SystemConfig));
+    _fb = (uint16_t*)(sizeof(SystemConfig));
 
     _oc = olivec_canvas(_fb, 320, 240, 320);
     _img_sprite = olivec_canvas((uint16_t*)image_raw, image_width, image_height, image_width);

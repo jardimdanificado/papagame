@@ -69,13 +69,8 @@ void draw_image_scaled(int dest_x, int dest_y, int dest_w, int dest_h) {
     }
 }
 
-__attribute__((visibility("default")))
-void* get_system_config(void) {
-    return (void*)&__heap_base;
-}
-
 void papagaio_init(void) {
-    _sys = (SystemConfig*)&__heap_base;
+    _sys = (SystemConfig*)0;
 
     _sys->width    = 320;
     _sys->height   = 240;
@@ -83,7 +78,7 @@ void papagaio_init(void) {
     _sys->vram     = 320 * 240 * 2;
     _sys->redraw   = 0;
 
-    _fb = (uint16_t*)((uint32_t)&__heap_base + sizeof(SystemConfig));
+    _fb = (uint16_t*)(sizeof(SystemConfig));
 }
 
 static int pos_x = 100;
