@@ -6,7 +6,7 @@ typedef          int   int32_t;
 
 #include "image_data.h"
 
-extern void init(const char* title, int w, int h, int bpp, int scale, int audio_size, int audio_rate, int audio_bpp);
+extern void init(const char* title, int w, int h, int bpp, int scale, int audio_size, int audio_rate, int audio_bpp, int audio_channels);
 
 #pragma pack(push, 1)
 typedef struct {
@@ -18,8 +18,9 @@ typedef struct {
     uint32_t audio_size;
     uint32_t audio_write_ptr;
     uint32_t audio_read_ptr;
-    uint32_t audio_sample_rate;
+        uint32_t audio_sample_rate;
     uint32_t audio_bpp;
+    uint32_t audio_channels;
     uint32_t redraw;
     uint32_t gamepad_buttons;
     int32_t  joystick_lx, joystick_ly, joystick_rx, joystick_ry;
@@ -72,7 +73,7 @@ static int scale_h = 100;
 __attribute__((visibility("default")))
 int main() {
     if (_sys->width == 0) {
-        init("Wagnostic - Images Example", 320, 240, 16, 4, 0, 0, 0);
+        init("Wagnostic - Images Example", 320, 240, 16, 4, 0, 0, 0, 2);
     }
 
     for (int i=0; i<(int)(_sys->width*_sys->height); i++) _fb[i] = 0;

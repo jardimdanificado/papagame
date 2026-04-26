@@ -5,3 +5,4 @@ wagnostic
 *.a
 wagnostic.sh
 wagnostic/
+*_data.h

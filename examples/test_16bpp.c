@@ -4,7 +4,7 @@ typedef unsigned short uint16_t;
 typedef unsigned int   uint32_t;
 typedef          int   int32_t;
 
-extern void init(const char* title, int w, int h, int bpp, int scale, int audio_size, int audio_rate, int audio_bpp);
+extern void init(const char* title, int w, int h, int bpp, int scale, int audio_size, int audio_rate, int audio_bpp, int audio_channels);
 
 #pragma pack(push, 1)
 typedef struct {
@@ -16,8 +16,9 @@ typedef struct {
     uint32_t audio_size;
     uint32_t audio_write_ptr;
     uint32_t audio_read_ptr;
-    uint32_t audio_sample_rate;
+        uint32_t audio_sample_rate;
     uint32_t audio_bpp;
+    uint32_t audio_channels;
     uint32_t redraw;
     uint32_t gamepad_buttons;
     int32_t  joystick_lx, joystick_ly, joystick_rx, joystick_ry;
@@ -36,7 +37,7 @@ typedef struct {
 
 int main() {
     if (_sys->width == 0) {
-        init("Wagnostic - 16bpp RGB565 Mode", 320, 240, 16, 1, 0, 0, 0);
+        init("Wagnostic - 16bpp RGB565 Mode", 320, 240, 16, 1, 0, 0, 0, 2);
     }
 
     // Fill background

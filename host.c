@@ -29,24 +29,25 @@ typedef struct {
     uint32_t audio_read_ptr;    // Offset 152
     uint32_t audio_sample_rate; // Offset 156
     uint32_t audio_bpp;         // Offset 160
+    uint32_t audio_channels;    // Offset 164
 
-    uint32_t redraw;            // Offset 164
+    uint32_t redraw;            // Offset 168
     
     // ---- Inputs ----
-    uint32_t gamepad_buttons;   // Offset 168
-    int32_t  joystick_lx;       // Offset 172
+    uint32_t gamepad_buttons;   // Offset 172
+    int32_t  joystick_lx;       // Offset 176
     int32_t  joystick_ly;
     int32_t  joystick_rx;
     int32_t  joystick_ry;
-    uint8_t  keys[256];         // Offset 188
+    uint8_t  keys[256];         // Offset 192
     
     // ---- Mouse ----
-    int32_t  mouse_x;           // Offset 444
-    int32_t  mouse_y;           // Offset 448
-    uint32_t mouse_buttons;     // Offset 452
-    int32_t  mouse_wheel;       // Offset 456
+    int32_t  mouse_x;           // Offset 448
+    int32_t  mouse_y;           // Offset 452
+    uint32_t mouse_buttons;     // Offset 456
+    int32_t  mouse_wheel;       // Offset 460
 
-    uint8_t  reserved[52];      // Offset 460 (to reach 512)
+    uint8_t  reserved[48];      // Offset 464 (to reach 512)
 } SystemConfig;
 #pragma pack(pop)
 
@@ -156,6 +157,10 @@ static void audio_callback(void* userdata, uint8_t* stream, int len) {
     SystemConfig* sys = (SystemConfig*)(mem + sys_wasm_offset);
     if (sys->audio_size == 0) return;
 
+    uint32_t bytes_per_sample = sys->audio_bpp;
+    uint32_t channels = sys->audio_channels;
+    if (channels == 0) channels = 2; // Safety fallback
+
     uint32_t bytes_per_pixel = sys->bpp / 8;
     uint8_t* audio_buf = mem + 512 + (sys->width * sys->height * bytes_per_pixel);
     
@@ -163,18 +168,24 @@ static void audio_callback(void* userdata, uint8_t* stream, int len) {
     uint32_t w = sys->audio_write_ptr;
     uint32_t size = sys->audio_size;
 
-    int available = (w >= r) ? (w - r) : (size - r + w);
-    int to_copy = (len < available) ? len : available;
+    int bytes_to_read = len;
+    int bytes_available = (w >= r) ? (w - r) : (size - r + w);
+    
+    if (bytes_to_read > bytes_available) bytes_to_read = bytes_available;
 
-    if (to_copy > 0) {
-        if (r + to_copy <= size) {
-            memcpy(stream, audio_buf + r, to_copy);
+    if (bytes_to_read > 0) {
+        if (r + bytes_to_read <= size) {
+            memcpy(stream, audio_buf + r, bytes_to_read);
         } else {
-            int first_part = size - r;
-            memcpy(stream, audio_buf + r, first_part);
-            memcpy(stream + first_part, audio_buf, to_copy - first_part);
+            int part1 = size - r;
+            memcpy(stream, audio_buf + r, part1);
+            memcpy(stream + part1, audio_buf, bytes_to_read - part1);
         }
-        sys->audio_read_ptr = (r + to_copy) % size;
+        sys->audio_read_ptr = (r + bytes_to_read) % size;
+    }
+
+    if (bytes_to_read < len) {
+        memset(stream + bytes_to_read, 0, len - bytes_to_read);
     }
 }
 
@@ -187,6 +198,7 @@ m3ApiRawFunction(host_init) {
     m3ApiGetArg(uint32_t, audio_size);
     m3ApiGetArg(uint32_t, audio_rate);
     m3ApiGetArg(uint32_t, audio_bpp);
+    m3ApiGetArg(uint32_t, audio_channels);
 
     if (bpp != 8 && bpp != 16 && bpp != 32) {
         fprintf(stderr, "FATAL ERROR: Invalid BPP value (%u). Wagnostic supports only 8, 16, or 32 bpp.\n", bpp);
@@ -211,11 +223,12 @@ m3ApiRawFunction(host_init) {
     sys->audio_size = audio_size;
     sys->audio_sample_rate = audio_rate;
     sys->audio_bpp = audio_bpp;
+    sys->audio_channels = audio_channels;
     sys->audio_read_ptr = 0;
     sys->audio_write_ptr = 0;
 
-    printf(">>> Wagnostic Init: '%s' %ux%u@%ubpp (Scale: %u, Audio: %u bytes @ %uHz, %ubpp)\n", 
-           sys->title, w, h, bpp, scale, audio_size, audio_rate, audio_bpp);
+    printf(">>> Wagnostic Init: '%s' %ux%u@%ubpp (Scale: %u, Audio: %u bytes @ %uHz, %ubpp, %u ch)\n", 
+           sys->title, w, h, bpp, scale, audio_size, audio_rate, audio_bpp, audio_channels);
 
     if (window) {
         SDL_SetWindowTitle(window, sys->title);
@@ -237,7 +250,7 @@ m3ApiRawFunction(host_init) {
         else if (audio_bpp == 4) wanted.format = AUDIO_F32SYS;
         else wanted.format = AUDIO_S16SYS; // Default
 
-        wanted.channels = 2; // Stereo for now
+        wanted.channels = audio_channels;
         wanted.samples = 1024;
         wanted.callback = audio_callback;
 
@@ -284,7 +297,7 @@ int main(int argc, char** argv) {
     }
 
     m3_LinkRawFunction(module, "env", "get_ticks", "i()", host_get_ticks);
-    m3_LinkRawFunction(module, "env", "init", "v(iiiiiiii)", host_init);
+    m3_LinkRawFunction(module, "env", "init", "v(iiiiiiiii)", host_init);
 
     IM3Function fn_frame;
     result = m3_FindFunction(&fn_frame, runtime, "game_frame");
