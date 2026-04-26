@@ -12,19 +12,12 @@ No APIs to learn. No SDKs to install. No engine. Just memory.
 
 Every Wagnostic session shares a single block of memory between the Host and the ROM. The layout is always the same:
 
-```
-┌─────────────────────────────────────┐  ← offset 0
-│         System Header               │  512 bytes (title, width, height,
-│  (config, inputs, audio pointers)   │   bpp, audio config, buttons, mouse...)
-├─────────────────────────────────────┤  ← offset 512
-│              VRAM                   │  width × height × (bpp/8) bytes
-│         (raw pixel data)            │
-├─────────────────────────────────────┤  ← offset 512 + vram_size
-│          Audio Ring Buffer          │  audio_size bytes
-├─────────────────────────────────────┤
-│          ROM Heap / RAM             │  everything else
-└─────────────────────────────────────┘
-```
+| Offset | Region | Size | Description |
+|--------|--------|------|-------------|
+| `0` | **System Header** | 512 bytes | Title, dimensions, BPP, audio config, input state. Fixed layout. |
+| `512` | **VRAM** | `width × height × (bpp/8)` | Raw pixel data. Written by ROM, read by Host. |
+| `512 + vram_size` | **Audio Buffer** | `audio_size` | PCM ring buffer. Written by ROM, drained by Host. |
+| above audio | **ROM RAM** | remainder | General purpose heap. Managed by the ROM. |
 
 The ROM draws by writing pixel values directly to offset `512`. The Host reads from there and blits to the screen. No draw calls. No render passes. Just a write.
 
