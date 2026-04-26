@@ -37,10 +37,33 @@ const btnMap = {
 };
 
 const wasmInput = document.getElementById('wasmInput');
+
+// Handle file input
 wasmInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
+    const buffer = await file.arrayBuffer();
+    await loadCartridge(buffer);
+});
+
+// Handle gallery clicks
+document.getElementById('gallery').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.gallery-btn');
+    if (!btn) return;
+    const url = btn.dataset.url;
+    if (url) {
+        try {
+            const response = await fetch(url);
+            const bytes = await response.arrayBuffer();
+            await loadCartridge(bytes);
+        } catch (err) {
+            console.error("Failed to load example:", err);
+        }
+    }
+});
+
+async function loadCartridge(buffer) {
     // Web Audio requires user interaction to start context
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -48,10 +71,8 @@ wasmInput.addEventListener('change', async (e) => {
     if (audioCtx.state === 'suspended') {
         audioCtx.resume();
     }
-
-    const buffer = await file.arrayBuffer();
     await loadWasm(buffer);
-});
+}
 
 async function loadWasm(buffer) {
     if (animationFrameId) {
@@ -121,7 +142,6 @@ async function loadWasm(buffer) {
 }
 
 function setupWebAudio(size, rate, bpp, channels) {
-    // ScriptProcessor is old but easier for dynamic ring buffer sync than AudioWorklet
     audioNode = audioCtx.createScriptProcessor(2048, 0, channels);
     
     audioNode.onaudioprocess = (e) => {
@@ -172,7 +192,6 @@ function setupWebAudio(size, rate, bpp, channels) {
             }
         }
         
-        // Zero out the rest if we didn't have enough data
         for (let i = Math.floor(samplesToRead / channels); i < frameCount; i++) {
             for (let ch = 0; ch < channels; ch++) {
                 outChannels[ch][i] = 0;
@@ -195,29 +214,24 @@ function gameLoop(now) {
 
         const dv = new DataView(wasmMemory.buffer);
 
-        // Sincroniza Input
         const wasmKeys = new Uint8Array(wasmMemory.buffer, sysOffset + 192, 256);
         wasmKeys.set(input.keys);
         dv.setUint32(sysOffset + 172, input.buttons, true);
 
-        // Sincroniza Mouse
         dv.setInt32(sysOffset + 448, input.mouse.x, true);
         dv.setInt32(sysOffset + 452, input.mouse.y, true);
         dv.setUint32(sysOffset + 456, input.mouse.buttons, true);
         dv.setInt32(sysOffset + 460, input.mouse.wheel, true);
 
-        // Chama o frame update
         const frameFunc = wasmInstance.exports.game_frame || wasmInstance.exports.main;
         if (frameFunc) frameFunc();
 
-        // Redraw
         const redraw = dv.getUint32(sysOffset + 168, true);
         if (redraw) {
             renderFrame(dv);
             dv.setUint32(sysOffset + 168, 0, true);
         }
 
-        // Título
         const titleBytes = new Uint8Array(wasmMemory.buffer, sysOffset + 0, 128);
         const firstZero = titleBytes.indexOf(0);
         const titleStr = new TextDecoder().decode(titleBytes.subarray(0, firstZero > -1 ? firstZero : 128)).trim();

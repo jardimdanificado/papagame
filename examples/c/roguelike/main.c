@@ -32,7 +32,7 @@ typedef struct {
     int32_t  mouse_x, mouse_y;
     uint32_t mouse_buttons;
     int32_t  mouse_wheel;
-    uint8_t  reserved[52];
+    uint8_t  reserved[48];
 } SystemConfig;
 #pragma pack(pop)
 
@@ -61,8 +61,8 @@ typedef struct {
 #define SPRITE_PLAYER  1
 #define SPRITE_MONSTER 45
 
-#define MAP_W 30
-#define MAP_H 21
+#define MAP_W 20
+#define MAP_H 15
 
 #define VIEW_W 10
 #define VIEW_H 7
@@ -180,7 +180,7 @@ static void reset_game() {
 __attribute__((visibility("default")))
 int main() {
     if (_sys->width == 0) {
-        init("Wagnostic - Roguelike Example", 320, 240, 16, 1, 0, 0, 0, 2);
+        init("Wagnostic - Roguelike Example", 320, 240, 16, 2, 0, 0, 0, 2);
         generate_map();
     }
 
@@ -239,8 +239,10 @@ int main() {
 
     for (int i = 0; i < (int)(_sys->width * _sys->height); i++) _fb[i] = RGB565(10, 10, 15);
 
-    int off_x = (320 - MAP_W * 8) / 2;
-    int off_y = (240 - MAP_H * 8) / 2;
+    int off_x = (320 - MAP_W * 16) / 2;
+    int off_y = (240 - MAP_H * 16) / 2;
+    if (off_x < 0) off_x = 0;
+    if (off_y < 0) off_y = 0;
 
     for (int y = 0; y < MAP_H; y++) {
         for (int x = 0; x < MAP_W; x++) {
@@ -248,38 +250,50 @@ int main() {
             
             int sx = (id % 16) * 16;
             int sy = (id / 16) * 16;
-            for (int j = 0; j < 8; j++) {
-                for (int i = 0; i < 8; i++) {
-                    uint16_t color = sheet_ptr[(sy + j*2) * 256 + (sx + i*2)];
-                    _fb[(off_y + y*8 + j) * 320 + (off_x + x*8 + i)] = color;
+            for (int j = 0; j < 16; j++) {
+                int py = off_y + y*16 + j;
+                if (py < 0 || py >= 240) continue;
+                for (int i = 0; i < 16; i++) {
+                    int px = off_x + x*16 + i;
+                    if (px < 0 || px >= 320) continue;
+                    uint16_t color = sheet_ptr[(sy + j) * 256 + (sx + i)];
+                    _fb[py * 320 + px] = color;
                 }
             }
         }
     }
 
-    int px = off_x + player.x * 8;
-    int py = off_y + player.y * 8;
+    int px_base = off_x + player.x * 16;
+    int py_base = off_y + player.y * 16;
     int id = SPRITE_PLAYER;
     int sx = (id % 16) * 16;
     int sy = (id / 16) * 16;
-    for (int j = 0; j < 8; j++) {
-        for (int i = 0; i < 8; i++) {
-            uint16_t color = sheet_ptr[(sy + j*2) * 256 + (sx + i*2)];
-            if (color != 0xF81F) _fb[(py + j) * 320 + (px + i)] = color;
+    for (int j = 0; j < 16; j++) {
+        int py = py_base + j;
+        if (py < 0 || py >= 240) continue;
+        for (int i = 0; i < 16; i++) {
+            int px = px_base + i;
+            if (px < 0 || px >= 320) continue;
+            uint16_t color = sheet_ptr[(sy + j) * 256 + (sx + i)];
+            if (color != 0xF81F) _fb[py * 320 + px] = color;
         }
     }
 
     for (int m = 0; m < num_monsters; m++) {
         if (monsters[m].hp > 0) {
-            int mx = off_x + monsters[m].x * 8;
-            int my = off_y + monsters[m].y * 8;
+            int mx_base = off_x + monsters[m].x * 16;
+            int my_base = off_y + monsters[m].y * 16;
             id = SPRITE_MONSTER;
             sx = (id % 16) * 16;
             sy = (id / 16) * 16;
-            for (int j = 0; j < 8; j++) {
-                for (int i = 0; i < 8; i++) {
-                    uint16_t color = sheet_ptr[(sy + j*2) * 256 + (sx + i*2)];
-                    if (color != 0xF81F) _fb[(my + j) * 320 + (mx + i)] = color;
+            for (int j = 0; j < 16; j++) {
+                int py = my_base + j;
+                if (py < 0 || py >= 240) continue;
+                for (int i = 0; i < 16; i++) {
+                    int px = mx_base + i;
+                    if (px < 0 || px >= 320) continue;
+                    uint16_t color = sheet_ptr[(sy + j) * 256 + (sx + i)];
+                    if (color != 0xF81F) _fb[py * 320 + px] = color;
                 }
             }
         }

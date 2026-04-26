@@ -1,0 +1,205 @@
+name: Release Manual
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (ex: 1.0.0)"
+        required: true
+        type: string
+      create_tag:
+        description: "Create tag vX.Y.Z if it does not exist"
+        required: true
+        default: true
+        type: boolean
+      prerelease:
+        description: "Mark release as pre-release"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x64
+            os: ubuntu-latest
+            target: linux
+            archive: linux-x64
+          - name: Linux x86 32-bit
+            os: ubuntu-latest
+            target: linux-x86
+            archive: linux-x86
+          - name: Linux ARM64
+            os: ubuntu-24.04-arm
+            target: linux-arm64
+            archive: linux-arm64
+          - name: macOS Intel x64
+            os: macos-15-intel
+            target: macos-intel
+            archive: macos-x64
+          - name: macOS ARM64
+            os: macos-14
+            target: macos-arm64
+            archive: macos-arm64
+          - name: Windows x64 (MinGW)
+            os: windows-latest
+            target: windows-mingw
+            archive: windows-x64-mingw
+          - name: Windows x86 32-bit (MinGW)
+            os: windows-latest
+            target: windows-mingw32
+            archive: windows-x86-mingw
+          - name: Windows x64 (MSVC)
+            os: windows-latest
+            target: windows-msvc
+            archive: windows-x64-msvc
+          - name: Windows x86 32-bit (MSVC)
+            os: windows-latest
+            target: windows-msvc32
+            archive: windows-x86-msvc
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Ubuntu Native)
+        if: matrix.os == 'ubuntu-latest' && (matrix.target == 'linux')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libsdl2-dev libgl1-mesa-dev pkg-config
+
+      - name: Install dependencies (Linux x86 32-bit)
+        if: matrix.target == 'linux-x86'
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib libsdl2-dev:i386 libgl1-mesa-dev:i386 pkg-config
+
+      - name: Install dependencies (macOS)
+        if: startsWith(matrix.target, 'macos')
+        run: |
+          brew install sdl2 pkg-config
+
+      - name: Setup MSYS2 (Windows MinGW)
+        if: startsWith(matrix.target, 'windows-mingw')
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.target == 'windows-mingw' && 'MINGW64' || 'MINGW32' }}
+          update: true
+          install: >-
+            git
+            make
+            ${{ matrix.target == 'windows-mingw' && 'mingw-w64-x86_64-gcc' || 'mingw-w64-i686-gcc' }}
+            ${{ matrix.target == 'windows-mingw' && 'mingw-w64-x86_64-sdl2' || 'mingw-w64-i686-sdl2' }}
+
+      - name: Build binary (Linux/macOS)
+        if: startsWith(matrix.target, 'linux') || startsWith(matrix.target, 'macos')
+        shell: bash
+        run: |
+          if [ "${{ matrix.target }}" = "linux-x86" ]; then
+            export CC="gcc -m32"
+          elif [ "${{ matrix.target }}" = "linux-arm64" ]; then
+            export CC=gcc
+          fi
+          make clean
+          make all
+
+      - name: Build binary (Windows MinGW)
+        if: startsWith(matrix.target, 'windows-mingw')
+        shell: msys2 {0}
+        run: |
+          make clean
+          gcc -Ilib/wasm3 -O2 runners/native/host.c lib/wasm3/*.c -o wagnostic.exe -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lm
+
+      - name: Build binary (Windows MSVC)
+        if: startsWith(matrix.target, 'windows-msvc')
+        shell: powershell
+        run: |
+          $v_arch = "${{ matrix.target == 'windows-msvc' && 'x64' || 'x86' }}"
+          $triplet = "${v_arch}-windows"
+          $cmake_arch = if ($v_arch -eq "x64") { "x64" } else { "Win32" }
+          vcpkg install sdl2:$triplet
+          cmake -S . -B build-msvc -A $cmake_arch -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=$triplet
+          cmake --build build-msvc --config Release
+
+      - name: Package artifact (Linux/macOS)
+        if: startsWith(matrix.target, 'linux') || startsWith(matrix.target, 'macos')
+        shell: bash
+        run: |
+          mkdir -p dist_pkg
+          cp wagnostic dist_pkg/
+          cp README.md dist_pkg/
+          tar -czf "wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.tar.gz" -C dist_pkg .
+
+      - name: Package artifact (Windows MinGW)
+        if: startsWith(matrix.target, 'windows-mingw')
+        shell: msys2 {0}
+        run: |
+          mkdir -p dist_pkg
+          cp wagnostic.exe dist_pkg/
+          cp README.md dist_pkg/
+          powershell -NoProfile -Command "Compress-Archive -Path dist_pkg\\* -DestinationPath wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.zip -Force"
+
+      - name: Package artifact (Windows MSVC)
+        if: startsWith(matrix.target, 'windows-msvc')
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path dist_pkg
+          Copy-Item build-msvc/Release/wagnostic.exe dist_pkg/
+          Copy-Item README.md dist_pkg/
+          Compress-Archive -Path dist_pkg/* -DestinationPath wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.zip -Force
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wagnostic-${{ matrix.target }}
+          path: |
+            *.tar.gz
+            *.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: ${{ !cancelled() }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create tag if requested
+        if: inputs.create_tag
+        run: |
+          tag="v${{ inputs.version }}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$tag" -m "Release $tag"
+            git push origin "$tag"
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: v${{ inputs.version }}
+          body: "Wagnostic v${{ inputs.version }} - Engine WASM Multi-plataforma."
+          prerelease: ${{ inputs.prerelease }}
+          files: |
+            artifacts/**/*

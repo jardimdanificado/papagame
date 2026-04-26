@@ -31,7 +31,7 @@ typedef struct {
     int32_t  mouse_x, mouse_y;
     uint32_t mouse_buttons;
     int32_t  mouse_wheel;
-    uint8_t  reserved[52];
+    uint8_t  reserved[48];
 } SystemConfig;
 #pragma pack(pop)
 

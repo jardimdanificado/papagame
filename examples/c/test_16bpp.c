@@ -26,26 +26,26 @@ typedef struct {
     int32_t  mouse_x, mouse_y;
     uint32_t mouse_buttons;
     int32_t  mouse_wheel;
-    uint8_t  reserved[52];
+    uint8_t  reserved[48];
 } SystemConfig;
 #pragma pack(pop)
 
 #define _sys ((volatile SystemConfig*)0)
-#define _fb  ((uint32_t*)512)
+#define _fb  ((uint16_t*)512)
 
-#define RGBA(r, g, b, a) (uint32_t)((a << 24) | (b << 16) | (g << 8) | r)
+#define RGB565(r, g, b) (uint16_t)((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | ((b) >> 3))
 
 int main() {
     if (_sys->width == 0) {
-        init("Wagnostic - 32bpp RGBA8888 Mode", 320, 240, 32, 4, 0, 0, 0, 2);
+        init("Wagnostic - 16bpp RGB565 Mode", 320, 240, 16, 1, 0, 0, 0, 2);
     }
 
     // Fill background
-    for (int i = 0; i < 320 * 240; i++) _fb[i] = RGBA(30, 30, 30, 255);
+    for (int i = 0; i < 320 * 240; i++) _fb[i] = RGB565(20, 40, 60);
 
     int x = _sys->mouse_x, y = _sys->mouse_y;
-    uint32_t color = RGBA(0, 200, 255, 255);
-    if (_sys->mouse_buttons) color = RGBA(255, 255, 0, 255);
+    uint16_t color = RGB565(0, 255, 0);
+    if (_sys->mouse_buttons) color = RGB565(255, 255, 255);
 
     for(int iy = -10; iy < 10; iy++) {
         for(int ix = -10; ix < 10; ix++) {

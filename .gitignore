@@ -6,3 +6,4 @@ wagnostic
 wagnostic.sh
 wagnostic/
 *_data.h
+*.raw

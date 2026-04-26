@@ -26,12 +26,12 @@ typedef struct {
     int32_t  mouse_x, mouse_y;
     uint32_t mouse_buttons;
     int32_t  mouse_wheel;
-    uint8_t  reserved[52];
+    uint8_t  reserved[48];
 } SystemConfig;
 #pragma pack(pop)
 
 #define _sys ((volatile SystemConfig*)0)
-#define _fb  ((volatile uint16_t*)296)
+#define _fb  ((volatile uint16_t*)512)
 
 #define RGB565(r, g, b) (uint16_t)((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | ((b) >> 3))
 

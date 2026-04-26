@@ -11,7 +11,7 @@ TARGET_HOST = wagnostic
 
 all: $(TARGET_HOST)
 
-$(TARGET_HOST): host.c
+$(TARGET_HOST): runners/native/host.c
 	$(CC) $(CFLAGS) $< $(WASM3_SRC) -o $@ $(LDFLAGS)
 
 CC_AARCH64 = aarch64-linux-gnu-gcc
@@ -27,7 +27,7 @@ portmaster:
 		echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ focal-updates main restricted universe multiverse' >> /etc/apt/sources.list && \
 		dpkg --add-architecture arm64 && apt-get update -qq && \
 		apt-get install -yq --no-install-recommends gcc-aarch64-linux-gnu libsdl2-dev:arm64 libgles2-mesa-dev:arm64 && \
-		$(CC_AARCH64) $(CFLAGS_AARCH64) host.c $(WASM3_SRC) -o wagnostic/$(TARGET_HOST) $(LDFLAGS_AARCH64) \
+		$(CC_AARCH64) $(CFLAGS_AARCH64) runners/native/host.c $(WASM3_SRC) -o wagnostic/$(TARGET_HOST) $(LDFLAGS_AARCH64) \
 	"
 	@echo "PortMaster build complete! Files are inside wagnostic/ and wagnostic.sh"
 	@echo "ZIP the files: zip -r wagnostic_port.zip wagnostic wagnostic.sh"
