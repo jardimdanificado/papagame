@@ -1,3 +1,5 @@
 *.wasm
 *.wat
 funnybuffer
+*.o
+*.a

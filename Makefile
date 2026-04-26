@@ -1,7 +1,5 @@
 CC = gcc
-PAPAGAIO_DIR = papagaio
-PAPAGAIOCC = ./$(PAPAGAIO_DIR)/papagaiocc
-WASM3_DIR = $(PAPAGAIO_DIR)/lib/wasm3
+WASM3_DIR = lib/wasm3
 WASM3_SRC = $(WASM3_DIR)/*.c
 
 CFLAGS = -I$(WASM3_DIR) -O2
@@ -9,24 +7,18 @@ LDFLAGS = -lSDL2 -lGL -lm
 
 TARGET_HOST = funnybuffer
 
-.PHONY: all clean papagaio update-papagaio
+.PHONY: all clean
 
-all: papagaio $(TARGET_HOST)
+all: $(TARGET_HOST)
 
-papagaio:
-	$(MAKE) -C $(PAPAGAIO_DIR)
-
-update-papagaio:
-	git submodule update --remote --merge
-
-$(TARGET_HOST): host.c | papagaio
+$(TARGET_HOST): host.c
 	$(CC) $(CFLAGS) $< $(WASM3_SRC) -o $@ $(LDFLAGS)
 
 CC_AARCH64 = aarch64-linux-gnu-gcc
-CFLAGS_AARCH64 = -Ipapagaio/lib/wasm3 -O2 -DPORTMASTER
+CFLAGS_AARCH64 = -Ilib/wasm3 -O2 -DPORTMASTER
 LDFLAGS_AARCH64 = -lSDL2 -lGLESv2 -lm
 
-portmaster: $(TARGET_WASM)
+portmaster:
 	mkdir -p funnybuffer
 	@echo "Montando ambiente de Cross-Compile no Docker..."
 	@sudo docker run --rm -e DEBIAN_FRONTEND=noninteractive -v $(PWD):/bld -w /bld ubuntu:20.04 bash -c " \
