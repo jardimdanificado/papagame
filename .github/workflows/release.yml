@@ -22,6 +22,9 @@ permissions:
   contents: write
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Build native host (matrix)
+  # ---------------------------------------------------------------------------
   build:
     name: Build (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
@@ -65,98 +68,178 @@ jobs:
             os: windows-latest
             target: windows-msvc32
             archive: windows-x86-msvc
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies (Ubuntu Native)
-        if: matrix.os == 'ubuntu-latest' && (matrix.target == 'linux')
+      # --- Linux x64 / ARM64 ---
+      - name: Deps (Linux x64 / ARM64)
+        if: matrix.target == 'linux' || matrix.target == 'linux-arm64'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libsdl2-dev libgl1-mesa-dev pkg-config
 
-      - name: Install dependencies (Linux x86 32-bit)
+      # --- Linux x86 32-bit ---
+      - name: Deps (Linux x86 32-bit)
         if: matrix.target == 'linux-x86'
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib libsdl2-dev:i386 libgl1-mesa-dev:i386 pkg-config
+          sudo apt-get install -y \
+            gcc-multilib \
+            libsdl2-dev:i386 \
+            libglib2.0-dev:i386 \
+            libdbus-1-dev:i386 \
+            libgl1-mesa-dev:i386 \
+            libasound2-dev:i386 \
+            pkg-config
 
-      - name: Install dependencies (macOS)
+      # --- macOS ---
+      - name: Deps (macOS)
         if: startsWith(matrix.target, 'macos')
-        run: |
-          brew install sdl2 pkg-config
+        run: brew install sdl2
 
-      - name: Setup MSYS2 (Windows MinGW)
-        if: startsWith(matrix.target, 'windows-mingw')
+      # --- Windows MinGW x64 ---
+      - name: Deps (Windows MinGW x64)
+        if: matrix.target == 'windows-mingw'
         uses: msys2/setup-msys2@v2
         with:
-          msystem: ${{ matrix.target == 'windows-mingw' && 'MINGW64' || 'MINGW32' }}
+          msystem: MINGW64
           update: true
-          install: >-
-            git
-            make
-            ${{ matrix.target == 'windows-mingw' && 'mingw-w64-x86_64-gcc' || 'mingw-w64-i686-gcc' }}
-            ${{ matrix.target == 'windows-mingw' && 'mingw-w64-x86_64-sdl2' || 'mingw-w64-i686-sdl2' }}
+          install: mingw-w64-x86_64-gcc mingw-w64-x86_64-sdl2
 
-      - name: Build binary (Linux/macOS)
-        if: startsWith(matrix.target, 'linux') || startsWith(matrix.target, 'macos')
-        shell: bash
+      # --- Windows MinGW x86 ---
+      - name: Deps (Windows MinGW x86)
+        if: matrix.target == 'windows-mingw32'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW32
+          update: true
+          install: mingw-w64-i686-gcc mingw-w64-i686-sdl2
+
+      # --- Build steps ---
+      - name: Build (Linux x64 / ARM64)
+        if: matrix.target == 'linux' || matrix.target == 'linux-arm64'
         run: |
-          if [ "${{ matrix.target }}" = "linux-x86" ]; then
-            export CC="gcc -m32"
-          elif [ "${{ matrix.target }}" = "linux-arm64" ]; then
-            export CC=gcc
-          fi
-          make clean
-          make all
+          gcc -Ilib/wasm3 -O2 \
+            runners/native/host.c lib/wasm3/*.c \
+            -o wagnostic \
+            $(pkg-config --cflags --libs sdl2) \
+            -lGL -lm
 
-      - name: Build binary (Windows MinGW)
-        if: startsWith(matrix.target, 'windows-mingw')
+      - name: Build (Linux x86)
+        if: matrix.target == 'linux-x86'
+        run: |
+          gcc -m32 -Ilib/wasm3 -O2 \
+            runners/native/host.c lib/wasm3/*.c \
+            -o wagnostic \
+            $(PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig pkg-config --cflags --libs sdl2) \
+            -lGL -lm
+
+      - name: Build (macOS)
+        if: startsWith(matrix.target, 'macos')
+        run: |
+          gcc -Ilib/wasm3 -O2 \
+            runners/native/host.c lib/wasm3/*.c \
+            -o wagnostic \
+            $(sdl2-config --cflags --libs) \
+            -framework OpenGL -lm
+
+      - name: Build (Windows MinGW x64)
+        if: matrix.target == 'windows-mingw'
         shell: msys2 {0}
         run: |
-          make clean
-          gcc -Ilib/wasm3 -O2 runners/native/host.c lib/wasm3/*.c -o wagnostic.exe -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lm
+          gcc -Ilib/wasm3 -O2 \
+            runners/native/host.c lib/wasm3/*.c \
+            -o wagnostic.exe \
+            -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lm
 
-      - name: Build binary (Windows MSVC)
-        if: startsWith(matrix.target, 'windows-msvc')
+      - name: Build (Windows MinGW x86)
+        if: matrix.target == 'windows-mingw32'
+        shell: msys2 {0}
+        run: |
+          gcc -Ilib/wasm3 -O2 \
+            runners/native/host.c lib/wasm3/*.c \
+            -o wagnostic.exe \
+            -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lm
+
+      - name: Build (Windows MSVC x64)
+        if: matrix.target == 'windows-msvc'
         shell: powershell
         run: |
-          $v_arch = "${{ matrix.target == 'windows-msvc' && 'x64' || 'x86' }}"
-          $triplet = "${v_arch}-windows"
-          $cmake_arch = if ($v_arch -eq "x64") { "x64" } else { "Win32" }
-          vcpkg install sdl2:$triplet
-          cmake -S . -B build-msvc -A $cmake_arch -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=$triplet
-          cmake --build build-msvc --config Release
+          vcpkg install sdl2:x64-windows
+          cmake -S . -B build -A x64 `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows
+          cmake --build build --config Release
 
-      - name: Package artifact (Linux/macOS)
-        if: startsWith(matrix.target, 'linux') || startsWith(matrix.target, 'macos')
-        shell: bash
+      - name: Build (Windows MSVC x86)
+        if: matrix.target == 'windows-msvc32'
+        shell: powershell
         run: |
-          mkdir -p dist_pkg
+          vcpkg install sdl2:x86-windows
+          cmake -S . -B build -A Win32 `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x86-windows
+          cmake --build build --config Release
+
+      # --- Package steps ---
+      - name: Package (Linux / macOS)
+        if: startsWith(matrix.target, 'linux') || startsWith(matrix.target, 'macos')
+        run: |
+          mkdir dist_pkg
           cp wagnostic dist_pkg/
           cp README.md dist_pkg/
           tar -czf "wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.tar.gz" -C dist_pkg .
 
-      - name: Package artifact (Windows MinGW)
-        if: startsWith(matrix.target, 'windows-mingw')
+      - name: Package (Windows MinGW x64)
+        if: matrix.target == 'windows-mingw'
         shell: msys2 {0}
         run: |
           mkdir -p dist_pkg
           cp wagnostic.exe dist_pkg/
+          cp /mingw64/bin/SDL2.dll dist_pkg/
           cp README.md dist_pkg/
-          powershell -NoProfile -Command "Compress-Archive -Path dist_pkg\\* -DestinationPath wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.zip -Force"
+          powershell -NoProfile -Command \
+            "Compress-Archive -Path dist_pkg\* -DestinationPath wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.zip -Force"
 
-      - name: Package artifact (Windows MSVC)
-        if: startsWith(matrix.target, 'windows-msvc')
+      - name: Package (Windows MinGW x86)
+        if: matrix.target == 'windows-mingw32'
+        shell: msys2 {0}
+        run: |
+          mkdir -p dist_pkg
+          cp wagnostic.exe dist_pkg/
+          cp /mingw32/bin/SDL2.dll dist_pkg/
+          cp README.md dist_pkg/
+          powershell -NoProfile -Command \
+            "Compress-Archive -Path dist_pkg\* -DestinationPath wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.zip -Force"
+
+      - name: Package (Windows MSVC x64)
+        if: matrix.target == 'windows-msvc'
         shell: powershell
         run: |
           New-Item -ItemType Directory -Force -Path dist_pkg
-          Copy-Item build-msvc/Release/wagnostic.exe dist_pkg/
+          Copy-Item build/Release/wagnostic.exe dist_pkg/
+          $dll = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin\SDL2.dll"
+          if (Test-Path $dll) { Copy-Item $dll dist_pkg/ }
           Copy-Item README.md dist_pkg/
-          Compress-Archive -Path dist_pkg/* -DestinationPath wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.zip -Force
+          Compress-Archive -Path dist_pkg/* `
+            -DestinationPath "wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.zip" -Force
 
-      - name: Upload artifacts
+      - name: Package (Windows MSVC x86)
+        if: matrix.target == 'windows-msvc32'
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path dist_pkg
+          Copy-Item build/Release/wagnostic.exe dist_pkg/
+          $dll = "$env:VCPKG_INSTALLATION_ROOT\installed\x86-windows\bin\SDL2.dll"
+          if (Test-Path $dll) { Copy-Item $dll dist_pkg/ }
+          Copy-Item README.md dist_pkg/
+          Compress-Archive -Path dist_pkg/* `
+            -DestinationPath "wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.zip" -Force
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: wagnostic-${{ matrix.target }}
@@ -201,6 +284,9 @@ jobs:
           path: wagnostic-v${{ inputs.version }}-examples.zip
           if-no-files-found: error
 
+  # ---------------------------------------------------------------------------
+  # Job 3: Publish Release
+  # ---------------------------------------------------------------------------
   release:
     name: Publish release
     runs-on: ubuntu-latest
@@ -235,7 +321,6 @@ jobs:
         with:
           tag_name: v${{ inputs.version }}
           name: v${{ inputs.version }}
-          body: "Wagnostic v${{ inputs.version }} - Engine WASM Multi-plataforma."
+          body: "Wagnostic v${{ inputs.version }}"
           prerelease: ${{ inputs.prerelease }}
-          files: |
-            artifacts/**/*
+          files: artifacts/**/*
