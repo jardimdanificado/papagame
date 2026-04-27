@@ -1,58 +1,11 @@
-
-typedef unsigned char  uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int   uint32_t;
-typedef          int   int32_t;
-typedef          int   bool;
-#define true 1
-#define false 0
-
+#include "wagnostic.h"
+#define OLIVEC_IMPLEMENTATION
+#include "olive.h"
 #include "data/sprites.h"
 
-#pragma pack(push, 1)
-typedef struct {
-    char     message[128];      // 0
-    uint32_t width;            // 128
-    uint32_t height;           // 132
-    uint32_t bpp;              // 136
-    uint32_t scale;             // 140
-    uint32_t audio_size;        // 144
-    uint32_t audio_write_ptr;   // 148
-    uint32_t audio_read_ptr;    // 152
-    uint32_t audio_sample_rate; // 156
-    uint32_t audio_bpp;         // 160
-    uint32_t audio_channels;    // 164
-    uint32_t signal_count;      // 168
-    
-    uint32_t gamepad_buttons;   // 172
-    int32_t  joystick_lx, joystick_ly, joystick_rx, joystick_ry; // 176
-    uint8_t  keys[256];         // 192
-    
-    int32_t  mouse_x;           // 448
-    int32_t  mouse_y;           // 452
-    uint32_t mouse_buttons;     // 456
-    int32_t  mouse_wheel;       // 460
+static Olivec_Canvas _oc;
+static Olivec_Canvas _sheet;
 
-    uint8_t  reserved[48];      // 464
-} SystemConfig;
-#pragma pack(pop)
-
-#define _sys ((volatile SystemConfig*)0)
-#define _sig ((volatile uint8_t*)512)
-static uint16_t* _fb;
-
-#define BTN_UP     (1 << 0)
-#define BTN_DOWN   (1 << 1)
-#define BTN_LEFT   (1 << 2)
-#define BTN_RIGHT  (1 << 3)
-#define BTN_START  (1 << 7)
-
-#define RGB565(r, g, b) (uint16_t)((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | ((b) >> 3))
-#define sheet_ptr ((const uint16_t*)image_raw)
-
-// ============================================
-// ROGUELIKE LOGIC
-// ============================================
 #define SPRITE_FLOOR   10
 #define SPRITE_WALL    25
 #define SPRITE_PLAYER  1
@@ -114,36 +67,24 @@ static void generate_map() {
     }
 }
 
-typedef enum { STATE_PLAYING, STATE_GAMEOVER } GameState;
-static GameState game_state = STATE_PLAYING;
 static uint32_t prev_buttons = 0;
 
-void reset_game() { game_state = STATE_PLAYING; generate_map(); }
-
 void winit() {
-    _sys->width = 320; _sys->height = 240; _sys->bpp = 16; _sys->scale = 4;
-    _sys->signal_count = 4;
-    _fb = (uint16_t*)(512 + _sys->signal_count);
-    const char* t = "Wagnostic - Roguelike";
-    for (int i = 0; i < 127 && t[i]; i++) ((char*)_sys->message)[i] = t[i];
-    _sig[1] = 3; generate_map();
+    w_setup("Wagnostic SDK - Roguelike", 320, 240, 16, 4, 8);
+    _oc = olivec_canvas(W_FB_PTR, 320, 240, 320, 16);
+    _sheet = olivec_canvas((uint16_t*)image_raw, image_width, image_height, image_width, 16);
+    generate_map();
 }
 
 __attribute__((visibility("default")))
 void wupdate() {
-    _fb = (uint16_t*)(512 + _sys->signal_count); // Ensure alignment
-    if (game_state == STATE_GAMEOVER) {
-        for (int i=0; i<320*240; i++) _fb[i] = RGB565(255, 0, 0);
-        uint32_t pressed = _sys->gamepad_buttons & ~prev_buttons;
-        prev_buttons = _sys->gamepad_buttons;
-        if (pressed & BTN_START) reset_game(); 
-        _sig[0] = 1; return;
-    }
-    uint32_t pressed = _sys->gamepad_buttons & ~prev_buttons;
-    prev_buttons = _sys->gamepad_buttons;
+    uint32_t pressed = W_SYS->gamepad_buttons & ~prev_buttons;
+    prev_buttons = W_SYS->gamepad_buttons;
+    
     int dx = 0, dy = 0;
-    if (pressed & BTN_LEFT) dx = -1; if (pressed & BTN_RIGHT) dx = 1;
-    if (pressed & BTN_UP) dy = -1; if (pressed & BTN_DOWN) dy = 1;
+    if (pressed & W_BTN_LEFT) dx = -1; if (pressed & W_BTN_RIGHT) dx = 1;
+    if (pressed & W_BTN_UP) dy = -1; if (pressed & W_BTN_DOWN) dy = 1;
+    
     if (dx != 0 || dy != 0) {
         int nx = player.x + dx; int ny = player.y + dy;
         if (nx >= 0 && nx < MAP_W && ny >= 0 && ny < MAP_H && map[ny][nx] == 0) {
@@ -157,38 +98,30 @@ void wupdate() {
                     int mdx = (player.x > monsters[i].x) ? 1 : (player.x < monsters[i].x ? -1 : 0);
                     int mdy = (player.y > monsters[i].y) ? 1 : (player.y < monsters[i].y ? -1 : 0);
                     int mnx = monsters[i].x + mdx; int mny = monsters[i].y + mdy;
-                    if (mnx == player.x && mny == player.y) { player.hp--; if (player.hp <= 0) game_state = STATE_GAMEOVER; }
+                    if (mnx == player.x && mny == player.y) { player.hp--; }
                     else if (map[mny][mnx] == 0) { monsters[i].x = mnx; monsters[i].y = mny; }
                 }
             }
         }
     }
-    for (int i = 0; i < 320 * 240; i++) _fb[i] = RGB565(10, 10, 15);
-    int off_x = (320 - MAP_W * 16) / 2; int off_y = (240 - MAP_H * 16) / 2;
+
+    olivec_fill(_oc, W_RGB565(10, 10, 15));
+    int off_x = (320 - MAP_W * 16) / 2, off_y = (240 - MAP_H * 16) / 2;
+    
     for (int y = 0; y < MAP_H; y++) {
         for (int x = 0; x < MAP_W; x++) {
             int id = (map[y][x] == 1) ? SPRITE_WALL : SPRITE_FLOOR;
-            int sx = (id % 16) * 16; int sy = (id / 16) * 16;
-            for (int j = 0; j < 16; j++) {
-                for (int i = 0; i < 16; i++) {
-                    _fb[(off_y + y*16 + j) * 320 + (off_x + x*16 + i)] = sheet_ptr[(sy + j) * 256 + (sx + i)];
-                }
-            }
+            olivec_sprite_copy(_oc, off_x + x*16, off_y + y*16, 16, 16, olivec_subcanvas(_sheet, (id%16)*16, (id/16)*16, 16, 16));
         }
     }
-    int psx = (SPRITE_PLAYER % 16) * 16; int psy = (SPRITE_PLAYER / 16) * 16;
-    for (int j = 0; j < 16; j++) for (int i = 0; i < 16; i++) {
-        uint16_t c = sheet_ptr[(psy + j) * 256 + (psx + i)];
-        if (c != 0xF81F) _fb[(off_y + player.y*16 + j) * 320 + (off_x + player.x*16 + i)] = c;
-    }
+    
+    olivec_sprite_copy(_oc, off_x + player.x*16, off_y + player.y*16, 16, 16, olivec_subcanvas(_sheet, (SPRITE_PLAYER%16)*16, (SPRITE_PLAYER/16)*16, 16, 16));
+    
     for (int m = 0; m < num_monsters; m++) {
         if (monsters[m].hp > 0) {
-            int msx = (SPRITE_MONSTER % 16) * 16; int msy = (SPRITE_MONSTER / 16) * 16;
-            for (int j = 0; j < 16; j++) for (int i = 0; i < 16; i++) {
-                uint16_t c = sheet_ptr[(msy + j) * 256 + (msx + i)];
-                if (c != 0xF81F) _fb[(off_y + monsters[m].y*16 + j) * 320 + (off_x + monsters[m].x*16 + i)] = c;
-            }
+            olivec_sprite_copy(_oc, off_x + monsters[m].x*16, off_y + monsters[m].y*16, 16, 16, olivec_subcanvas(_sheet, (SPRITE_MONSTER%16)*16, (SPRITE_MONSTER/16)*16, 16, 16));
         }
     }
-    _sig[0] = 1;
+    
+    w_redraw();
 }
