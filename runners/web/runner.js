@@ -50,20 +50,6 @@ wasmInput.addEventListener('change', async (e) => {
     await loadCartridge(buffer);
 });
 
-document.getElementById('gallery').addEventListener('click', async (e) => {
-    const btn = e.target.closest('.gallery-btn');
-    if (!btn) return;
-    const url = btn.dataset.url;
-    if (url) {
-        try {
-            const response = await fetch(url);
-            const bytes = await response.arrayBuffer();
-            await loadCartridge(bytes);
-        } catch (err) {
-            console.error("Failed to load example:", err);
-        }
-    }
-});
 
 async function loadCartridge(buffer) {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();

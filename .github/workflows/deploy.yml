@@ -20,31 +20,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang xxd ffmpeg
 
-      - name: Build WebAssembly Examples
-        run: |
-          cd examples
-          make clean
-          make
-          make audio
-
       - name: Prepare Deployment Directory
         run: |
           mkdir dist
           cp -r runners/web/* dist/
-          mkdir -p dist/examples/c
-          cp examples/*.wasm dist/examples/c/
-
-      - name: Generate Gallery Buttons
-        run: |
-          BUTTONS=""
-          for f in dist/examples/c/*.wasm; do
-            NAME=$(basename "$f" .wasm)
-            # Converte snake_case para Title Case para o botão
-            LABEL=$(echo "$NAME" | sed 's/_/ /g' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2)} 1')
-            BUTTONS="$BUTTONS<button class='gallery-btn' data-url='examples/c/$NAME.wasm'>$LABEL</button>"
-          done
-          # Injeta os botões no placeholder do HTML
-          sed -i "s|<!-- EXAMPLES_PLACEHOLDER -->|$BUTTONS|g" dist/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

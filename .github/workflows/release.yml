@@ -259,41 +259,6 @@ jobs:
             *.zip
           if-no-files-found: error
 
-  # ---------------------------------------------------------------------------
-  # Job 2: Build WASM Examples (runs once on Linux)
-  # ---------------------------------------------------------------------------
-  build-examples:
-    name: Build WASM Examples
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang xxd ffmpeg
-
-      - name: Build examples
-        run: |
-          cd examples
-          make clean
-          make
-          make audio
-
-      - name: Package examples
-        run: |
-          mkdir -p examples_pkg/examples
-          cp examples/*.wasm examples_pkg/examples/
-          cd examples_pkg
-          zip -r "../wagnostic${{ inputs.version }}-examples.zip" examples/
-
-      - name: Upload examples artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wagnostic-examples
-          path: wagnostic${{ inputs.version }}-examples.zip
-          if-no-files-found: error
 
   # ---------------------------------------------------------------------------
   # Job 3: Publish Release
@@ -301,7 +266,7 @@ jobs:
   release:
     name: Publish release
     runs-on: ubuntu-latest
-    needs: [build, build-examples]
+    needs: [build]
     if: ${{ !cancelled() }}
     steps:
       - name: Checkout
