@@ -141,18 +141,23 @@ static void init_sdl_from_header() {
     if (!mem) return;
     SystemConfig* sys = (SystemConfig*)(mem + sys_wasm_offset);
     
+    static bool first_init = true;
     W = sys->width; H = sys->height; BPP = sys->bpp;
     SCALE = sys->scale;
     if (SCALE == 0) SCALE = 1;
 
-    printf(">>> Wagnostic ROM Metadata: '%s' %ux%u@%ubpp (Scale: %u)\n", 
-           sys->message, W, H, BPP, SCALE);
+    if (first_init) {
+        printf(">>> Wagnostic ROM Metadata: '%s' %ux%u@%ubpp (Scale: %u)\n", 
+               sys->message, W, H, BPP, SCALE);
+        first_init = false;
+    }
 
     if (!window) {
         SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
         window = SDL_CreateWindow(sys->message[0] ? sys->message : "Wagnostic", 
                                 SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
                                 W * SCALE, H * SCALE, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+        if (!window) fprintf(stderr, "SDL_CreateWindow Error: %s\n", SDL_GetError());
     } else {
         SDL_SetWindowSize(window, W * SCALE, H * SCALE);
         SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
@@ -205,8 +210,15 @@ int main(int argc, char** argv) {
     m3_LinkRawFunction(module, "env", "get_ticks", "i()", host_get_ticks);
 
     IM3Function fn_init = NULL;
-    m3_FindFunction(&fn_init, runtime, "winit");
-    if (fn_init) m3_CallV(fn_init);
+    if (m3_FindFunction(&fn_init, runtime, "winit") != m3Err_none) {
+        m3_FindFunction(&fn_init, runtime, "init");
+    }
+    
+    if (fn_init) {
+        result = m3_CallV(fn_init);
+        if (result) { fprintf(stderr, "ROM INIT ERROR: %s\n", result); return 1; }
+        printf("ROM Initialized successfully.\n");
+    }
 
     uint8_t* mem_ptr = m3_GetMemory(runtime, NULL, 0);
     if (mem_ptr) {
@@ -222,8 +234,10 @@ int main(int argc, char** argv) {
         }
     }
 
-    IM3Function fn_frame;
-    m3_FindFunction(&fn_frame, runtime, "wupdate");
+    IM3Function fn_frame = NULL;
+    if (m3_FindFunction(&fn_frame, runtime, "wupdate") != m3Err_none) {
+        m3_FindFunction(&fn_frame, runtime, "frame");
+    }
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) return 1;
     init_sdl_from_header();

@@ -78,7 +78,8 @@ Offset  Size  Field            R/W        Description
 456     4     mouse_buttons    Host→ROM   Mouse button bitmask (bit 0 = left, 1 = right, 2 = middle).
 460     4     mouse_wheel      Host→ROM   Wheel delta (positive = scroll up).
 464     48    reserved         —          Do not use. Reserved for future fields.
-512     ...   VRAM             ROM→Host   Raw pixel data. (Start of framebuffer)
+512     ...   signals          ROM→Host   Signal slots (size defined by signal_count).
+512+sc  ...   VRAM             ROM→Host   Raw pixel data (Framebuffer).
 ```
 
 ---
@@ -86,7 +87,7 @@ Offset  Size  Field            R/W        Description
 ## 4. Video / Framebuffer
 
 ### 4.1 Location and Size
-VRAM starts at byte offset **512** and its size is:
+VRAM starts at byte offset **512 + signal_count** and its size is:
 ```
 vram_size = width * height * (bpp / 8)
 ```
@@ -223,7 +224,7 @@ Range: **-32767** to **+32767**. Zero is centered.
 ### 6.1 Ring Buffer Mechanics
 If `audio_size > 0`, the Host must allocate a ring buffer of that size starting at:
 ```
-audio_buffer_start = 512 + vram_size
+audio_buffer_start = 512 + signal_count + vram_size
 ```
 
 The ROM writes audio samples into the ring buffer and advances `audio_write` (offset 148).
@@ -326,7 +327,8 @@ if audio_size > 0:
 frame_fn = instance.export["wupdate"]
 
 vram_size   = read_u32(mem, 128) * read_u32(mem, 132) * (read_u32(mem, 136) / 8)
-audio_start = 512 + vram_size
+sc          = read_u32(mem, 168)
+audio_start = 512 + sc + vram_size
 audio_size  = read_u32(mem, 144)
 
 // --- Main Loop ---
@@ -348,12 +350,19 @@ while window_open:
     // 2. Call ROM
     frame_fn()
 
-    // 3. Draw if requested
-    redraw = read_u32(mem, 168)
-    if redraw == 1:
-        blit(mem, 512, vram_size, width, height, bpp)
-        write_u32(mem, 168, 0)
-        write_u32(mem, 460, 0)  // reset mouse wheel
+    // 3. Process Signals
+    signal_count = read_u32(mem, 168)
+    signals = mem + 512
+    for i from 0 to signal_count - 1:
+        sig = signals[i]
+        if sig == 1: // REDRAW
+            blit(mem, 512 + signal_count, vram_size, width, height, bpp)
+        if sig == 2: // QUIT
+            exit()
+        // ... handle other signals (log, title update)
+        signals[i] = 0 // Clear signal
+    
+    write_u32(mem, 460, 0)  // reset mouse wheel
 
     // 4. Feed audio
     if audio_size > 0:
@@ -375,7 +384,9 @@ while window_open:
 - [ ] Writes gamepad bitmask at offset 172.
 - [ ] Writes joystick axes at offsets 176–191 (int32, -32767..32767).
 - [ ] Writes mouse position, buttons, and wheel at offsets 448–463.
-- [ ] Reads `redraw` at offset 168. Blits VRAM when it equals 1, then resets to 0.
+- [ ] Reads `signal_count` at offset 168.
+- [ ] Processes the signal buffer starting at offset 512.
+- [ ] Blits VRAM (starting at 512 + `signal_count`) when signal `1` is received.
+- [ ] Clears processed signals in the buffer (writes 0).
 - [ ] Reads audio ring buffer using `audio_read`/`audio_write` pointers.
-- [ ] Does NOT read VRAM until `redraw == 1`.
-- [ ] Does NOT write to ROM-owned fields (`title`, `width`, `height`, `bpp`, `audio_write`).
+- [ ] Does NOT write to ROM-owned fields (`message`, `width`, `height`, `bpp`, `audio_write`, `signal_count`).

@@ -1,7 +1,7 @@
 #include "wagnostic.h"
 #define OLIVEC_IMPLEMENTATION
 #include "olive.h"
-#include "image_data.h"
+#include "image.h"
 
 extern uint32_t get_ticks();
 

@@ -19,11 +19,20 @@ all: buttons_test.wasm test_8bpp.wasm test_16bpp.wasm test_32bpp.wasm \
 audio: audio_test.wasm audio_example.wasm
 
 # Data Generation Rules
-c/draw/image_data.h: c/images/image.webp
+c/draw/image.h: c/images/image.webp
 	$(IMG2FB) c/images/image.webp c/draw/image 16
 
-c/images/image_data.h: c/images/image.webp
+c/images/image.h: c/images/image.webp
 	$(IMG2FB) c/images/image.webp c/images/image 16
+
+c/images/image8.h: c/images/image.webp
+	$(IMG2FB) c/images/image.webp c/images/image8 8
+
+c/images/image16.h: c/images/image.webp
+	$(IMG2FB) c/images/image.webp c/images/image16 16
+
+c/images/image32.h: c/images/image.webp
+	$(IMG2FB) c/images/image.webp c/images/image32 32
 
 c/audio/audio_data.h: c/audio/audio.mp3
 	$(AUDIO2PCM) c/audio/audio.mp3 c/audio/audio_data.h --name music
@@ -35,22 +44,22 @@ audio_example.wasm: c/audio/main.c c/audio/audio_data.h
 buttons_test.wasm: c/buttons_test.c
 	$(CLANG) $(CFLAGS) $(MEM_FLAGS) $(LDFLAGS) c/buttons_test.c -o buttons_test.wasm
 
-test_8bpp.wasm: c/test_8bpp.c
-	$(CLANG) $(CFLAGS) $(MEM_FLAGS) $(LDFLAGS) c/test_8bpp.c -o test_8bpp.wasm
+test_8bpp.wasm: c/test_8bpp.c c/images/image8.h
+	$(CLANG) $(CFLAGS) -Ic/images $(MEM_FLAGS) $(LDFLAGS) c/test_8bpp.c -o test_8bpp.wasm
 
-test_16bpp.wasm: c/test_16bpp.c
-	$(CLANG) $(CFLAGS) $(MEM_FLAGS) $(LDFLAGS) c/test_16bpp.c -o test_16bpp.wasm
+test_16bpp.wasm: c/test_16bpp.c c/images/image16.h
+	$(CLANG) $(CFLAGS) -Ic/images $(MEM_FLAGS) $(LDFLAGS) c/test_16bpp.c -o test_16bpp.wasm
 
-test_32bpp.wasm: c/test_32bpp.c
-	$(CLANG) $(CFLAGS) $(MEM_FLAGS) $(LDFLAGS) c/test_32bpp.c -o test_32bpp.wasm
+test_32bpp.wasm: c/test_32bpp.c c/images/image32.h
+	$(CLANG) $(CFLAGS) -Ic/images $(MEM_FLAGS) $(LDFLAGS) c/test_32bpp.c -o test_32bpp.wasm
 
 audio_test.wasm: c/audio_test.c
 	$(CLANG) $(CFLAGS) $(MEM_FLAGS) $(LDFLAGS) c/audio_test.c -o audio_test.wasm
 
-draw_example.wasm: c/draw/main.c c/draw/olive.c c/draw/image_data.h
+draw_example.wasm: c/draw/main.c c/draw/image.h
 	$(CLANG) $(CFLAGS) -Ic/draw $(MEM_FLAGS) $(LDFLAGS) c/draw/main.c -o draw_example.wasm
 
-images_example.wasm: c/images/main.c c/images/image_data.h
+images_example.wasm: c/images/main.c c/images/image.h
 	$(CLANG) $(CFLAGS) -Ic/images $(MEM_FLAGS) $(LDFLAGS) c/images/main.c -o images_example.wasm
 
 roguelike_example.wasm: c/roguelike/main.c c/roguelike/data/sprites.h
@@ -64,6 +73,6 @@ fallback_test.wasm: c/fallback_test.c
 
 clean:
 	rm -f *.wasm
-	rm -f c/draw/image_data.h c/draw/*.raw
-	rm -f c/images/image_data.h c/images/*.raw
+	rm -f c/draw/*.h c/draw/*.raw
+	rm -f c/images/*.h c/images/*.raw
 	rm -f c/audio/audio_data.h

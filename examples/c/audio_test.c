@@ -1,79 +1,54 @@
-
-typedef unsigned char  uint8_t;
-typedef unsigned short uint16_t;
-typedef          short int16_t;
-typedef unsigned int   uint32_t;
-typedef          int   int32_t;
-
-#pragma pack(push, 1)
-typedef struct {
-    char     message[128];
-    uint32_t width;
-    uint32_t height;
-    uint32_t bpp;
-    uint32_t scale;
-    uint32_t audio_size;
-    uint32_t audio_write_ptr;
-    uint32_t audio_read_ptr;
-    uint32_t audio_sample_rate, audio_bpp, audio_channels;
-    uint32_t signal_count;
-    uint32_t gamepad_buttons;
-    int32_t  joystick_lx, joystick_ly, joystick_rx, joystick_ry;
-    uint8_t  keys[256];
-    int32_t  mouse_x, mouse_y;
-    uint32_t mouse_buttons;
-    int32_t  mouse_wheel;
-    uint8_t  reserved[48];
-} SystemConfig;
-#pragma pack(pop)
-
-#define _sys ((volatile SystemConfig*)0)
-#define _sig ((volatile uint8_t*)512)
-static uint16_t* _fb;
-
-void winit() {
-    _sys->width = 320;
-    _sys->height = 240;
-    _sys->bpp = 16;
-    _sys->scale = 4;
-    _sys->signal_count = 4;
-    _fb = (uint16_t*)(512 + _sys->signal_count);
-    _sys->audio_size = 16384;
-    _sys->audio_sample_rate = 44100;
-    _sys->audio_bpp = 2;
-    _sys->audio_channels = 1;
-    const char* t = "Wagnostic - Audio Sine Test";
-    for (int i = 0; i < 127 && t[i]; i++) ((char*)_sys->message)[i] = t[i];
-    _sig[1] = 3;
-}
+#include "wagnostic.h"
 
 #define SAMPLE_RATE 44100
-#define PI 3.14159265f
+
+static uint16_t* _fb;
+static int16_t* _audio_buf;
 static float phase = 0;
+static uint32_t frame_count = 0;
+
+__attribute__((visibility("default")))
+void winit() {
+    w_setup("Wagnostic - Audio Test", 320, 240, 16, 2, 8);
+    _fb = (uint16_t*)W_FB_PTR;
+    
+    W_SYS->audio_size = 16384;
+    W_SYS->audio_sample_rate = SAMPLE_RATE;
+    W_SYS->audio_bpp = 2;
+    W_SYS->audio_channels = 1;
+    
+    W_SIGNALS[4] = W_SIG_UPDATE_AUDIO; 
+    _audio_buf = (int16_t*)w_audio_ptr();
+}
 
 __attribute__((visibility("default")))
 void wupdate() {
-    uint8_t* mem = (uint8_t*)0;
-    uint32_t audio_ptr = 512 + _sys->signal_count + (_sys->width * _sys->height * (_sys->bpp / 8));
-    int16_t* audio_buf = (int16_t*)(mem + audio_ptr);
+    uint32_t write_ptr = W_SYS->audio_write_ptr;
+    uint32_t read_ptr = W_SYS->audio_read_ptr;
+    uint32_t size = W_SYS->audio_size;
 
     uint32_t free_space;
-    if (_sys->audio_write_ptr >= _sys->audio_read_ptr) {
-        free_space = _sys->audio_size - (_sys->audio_write_ptr - _sys->audio_read_ptr);
+    if (write_ptr >= read_ptr) {
+        free_space = size - (write_ptr - read_ptr);
     } else {
-        free_space = _sys->audio_read_ptr - _sys->audio_write_ptr;
+        free_space = read_ptr - write_ptr;
     }
 
     uint32_t to_write = free_space > 1024 ? 1024 : free_space;
     for (uint32_t i = 0; i < to_write / 2; i++) {
-        float sample = 0.5f * __builtin_sinf(phase);
-        audio_buf[(_sys->audio_write_ptr / 2 + i) % (_sys->audio_size / 2)] = (int16_t)(sample * 32767);
-        phase += 2.0f * PI * 440.0f / SAMPLE_RATE;
-        if (phase > 2.0f * PI) phase -= 2.0f * PI;
+        // Lower volume: multiplier reduced to 4096.0f
+        int16_t sample = (int16_t)((phase * 2.0f - 1.0f) * 4096.0f);
+        _audio_buf[(write_ptr / 2 + i) % (size / 2)] = sample;
+        
+        phase += 440.0f / SAMPLE_RATE;
+        if (phase > 1.0f) phase -= 1.0f;
     }
-    _sys->audio_write_ptr = (_sys->audio_write_ptr + to_write) % _sys->audio_size;
+    W_SYS->audio_write_ptr = (write_ptr + to_write) % size;
 
-    // Simple visual feedback
-    for(int i=0; i<320*240; i++) _fb[i] = (uint16_t)(phase * 1000);
-    _sig[0] = 1;
+    // Slow visual feedback: color changes every 30 frames (~0.5s)
+    frame_count++;
+    uint16_t color = (frame_count / 30) % 2 ? 0x001F : 0x000F; // Deep Blue to Mid Blue
+    for(int i=0; i<320*240; i++) _fb[i] = color;
+    
+    w_redraw();
 }
