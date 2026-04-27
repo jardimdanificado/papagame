@@ -1,7 +1,7 @@
 
 CLANG = clang
-CFLAGS = --target=wasm32 -nostdlib -fno-delete-null-pointer-checks -O3 -w -I../lib
-LDFLAGS = -Wl,--no-entry -Wl,--export-all -Wl,--allow-undefined -Wl,--global-base=1048576
+CFLAGS = --target=wasm32 -nostdlib -fno-delete-null-pointer-checks -fno-common -O3 -w -I../lib
+LDFLAGS = -Wl,--no-entry -Wl,--export-all -Wl,--allow-undefined -Wl,--global-base=1048576 -Wl,-z,stack-size=65536
 MEM_FLAGS = -Wl,--initial-memory=8388608
 
 # Tools
