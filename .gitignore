@@ -1,6 +1,7 @@
 *.wasm
 *.wat
 wagnostic
+wagnostic-term
 *.o
 *.a
 wagnostic.sh

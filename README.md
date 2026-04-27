@@ -1,10 +1,10 @@
-# 🛸 Wagnostic
+# Wagnostic
 
-**The Universal, Protocol-First Virtual Console.**
+**The Universal, Protocol-First "Virtual Console".**
 
-Wagnostic is a minimalist, platform-agnostic specification and runtime for high-performance interactive applications.
+Wagnostic is a minimalist, platform-agnostic specification and runtime for multimedia applications.
 
-## 📦 Memory Layout
+## Memory Layout
 
 | Offset | Hex | Name | Description |
 | :--- | :--- | :--- | :--- |
@@ -14,7 +14,7 @@ Wagnostic is a minimalist, platform-agnostic specification and runtime for high-
 | 464 | `0x1D0` | **Signals** | **4 Fixed Signals** (Processed by Host). |
 | 512 | `0x200` | **VRAM** | **Raw Framebuffer (Always at 512)**. |
 
-## 🛠️ Quick Start (C SDK)
+## Quick Start
 
 ```c
 #include "wagnostic.h"
@@ -29,7 +29,7 @@ void wupdate() {
 }
 ```
 
-## 🏗️ Building
+## Building
 
 ```bash
 make            # Build Host
@@ -37,5 +37,5 @@ make -C examples # Build ROMs
 ./wagnostic examples/audio_test.wasm
 ```
 
-## 📜 Full Specification
+## Full Specification
 See [SPECIFICATION.md](./SPECIFICATION.md) for the complete technical reference.

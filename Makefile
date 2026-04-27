@@ -14,6 +14,9 @@ all: $(TARGET_HOST)
 $(TARGET_HOST): runners/native/host.c
 	$(CC) $(CFLAGS) $< $(WASM3_SRC) -o $@ $(LDFLAGS)
 
+term: runners/native/ncurses_host.c
+	$(CC) $(CFLAGS) $< $(WASM3_SRC) -o wagnostic-term -lncurses -lm
+
 CC_AARCH64 = aarch64-linux-gnu-gcc
 CFLAGS_AARCH64 = -Ilib/wasm3 -O2 -DPORTMASTER
 LDFLAGS_AARCH64 = -lSDL2 -lGLESv2 -lm
@@ -33,4 +36,4 @@ portmaster:
 	@echo "ZIP the files: zip -r wagnostic_port.zip wagnostic wagnostic.sh"
 
 clean:
-	rm -rf $(TARGET_HOST) wagnostic
+	rm -rf $(TARGET_HOST) wagnostic-term wagnostic

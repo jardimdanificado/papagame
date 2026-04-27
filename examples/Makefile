@@ -13,7 +13,7 @@ AUDIO2PCM = ../tools/audio2pcm.py
 # Default target: only light examples
 all: buttons_test.wasm test_8bpp.wasm test_16bpp.wasm test_32bpp.wasm \
 	draw_example.wasm images_example.wasm roguelike_example.wasm tracker_example.wasm \
-	fallback_test.wasm
+	fallback_test.wasm terminal_test.wasm
 
 # Heavy examples target
 audio: audio_test.wasm audio_example.wasm
@@ -70,6 +70,9 @@ tracker_example.wasm: c/tracker/main.c
 
 fallback_test.wasm: c/fallback_test.c
 	$(CLANG) $(CFLAGS) $(MEM_FLAGS) $(LDFLAGS) c/fallback_test.c -o fallback_test.wasm
+
+terminal_test.wasm: c/terminal_test.c
+	$(CLANG) $(CFLAGS) $(MEM_FLAGS) $(LDFLAGS) c/terminal_test.c -o terminal_test.wasm
 
 clean:
 	rm -f *.wasm
