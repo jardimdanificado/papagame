@@ -4,29 +4,45 @@
 static uint16_t* _fb;
 static uint8_t* _audio_buf;
 
-extern uint32_t get_ticks();
-
 void winit() {
-    w_setup("Wagnostic - Audio Player", 320, 240, 16, 4, 8);
+    w_setup("Wagnostic - Audio Player", 320, 240, 16, 4, 0);
     _fb = (uint16_t*)W_FB_PTR;
     
     W_SYS->audio_size = music_size;
     W_SYS->audio_sample_rate = 44100;
     W_SYS->audio_bpp = 2;
     W_SYS->audio_channels = 2;
-    W_SYS->audio_write_ptr = 0;
-    W_SYS->audio_read_ptr = 0;
+    W_SYS->audio_write = 0;
+    W_SYS->audio_read = 0;
     
-    W_SIGNALS[4] = W_SIG_UPDATE_AUDIO; 
+    W_SIGNALS[2] = W_SIG_UPDATE_AUDIO; 
     _audio_buf = (uint8_t*)w_audio_ptr();
 }
 
 void fill_audio() {
-    uint32_t to_write = 16384; 
+    uint32_t r = W_SYS->audio_read;
+    uint32_t w = W_SYS->audio_write;
+    uint32_t size = W_SYS->audio_size;
+
+    // Calculate occupied space
+    uint32_t occupied;
+    if (w >= r) occupied = w - r;
+    else occupied = size - r + w;
+
+    // We want to keep the buffer reasonably full, but not overflow
+    // At 44.1kHz stereo 16-bit, we need ~176KB per second.
+    // Let's keep about 0.5s of audio ahead (88KB)
+    uint32_t target_buffer = 88200; 
+    if (occupied >= target_buffer) return;
+
+    uint32_t to_write = target_buffer - occupied;
+    if (to_write > 16384) to_write = 16384; // write in chunks
+
     for (uint32_t i = 0; i < to_write; i++) {
-        _audio_buf[W_SYS->audio_write_ptr] = music_data[W_SYS->audio_write_ptr];
-        W_SYS->audio_write_ptr = (W_SYS->audio_write_ptr + 1) % music_size;
+        _audio_buf[w] = music_data[w];
+        w = (w + 1) % size;
     }
+    W_SYS->audio_write = w;
 }
 
 __attribute__((visibility("default")))
@@ -34,10 +50,9 @@ void wupdate() {
     static uint32_t last_tick = 0;
     static uint16_t color = 0;
     
-    uint32_t now = get_ticks();
+    uint32_t now = W_SYS->ticks;
     if (now - last_tick > 1000) {
-        // Muda a cor da tela baseado na posição da música, mas só a cada 1s
-        color = (uint16_t)((W_SYS->audio_write_ptr >> 8) & 0xFFFF);
+        color = (uint16_t)((W_SYS->audio_write >> 8) & 0xFFFF);
         last_tick = now;
     }
 

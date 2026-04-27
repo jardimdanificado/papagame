@@ -36,12 +36,12 @@ void winit() {
         _sprites[i].vx = (float)((rand_u32() % 4) + 1); _sprites[i].vy = (float)((rand_u32() % 4) + 1);
         if (rand_u32() % 2) _sprites[i].vx *= -1; if (rand_u32() % 2) _sprites[i].vy *= -1;
     }
-    _last_time = get_ticks();
+    _last_time = W_SYS->ticks;
 }
 
 __attribute__((visibility("default")))
 void wupdate() {
-    uint32_t now = get_ticks(); _frame_count++;
+    uint32_t now = W_SYS->ticks; _frame_count++;
     if (now - _last_time >= 1000) {
         _fps = _frame_count; _frame_count = 0; _last_time = now;
         char num[16]; int_to_str(_fps, num);

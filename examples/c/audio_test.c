@@ -17,14 +17,14 @@ void winit() {
     W_SYS->audio_bpp = 2;
     W_SYS->audio_channels = 1;
     
-    W_SIGNALS[4] = W_SIG_UPDATE_AUDIO; 
+    W_SIGNALS[2] = W_SIG_UPDATE_AUDIO; 
     _audio_buf = (int16_t*)w_audio_ptr();
 }
 
 __attribute__((visibility("default")))
 void wupdate() {
-    uint32_t write_ptr = W_SYS->audio_write_ptr;
-    uint32_t read_ptr = W_SYS->audio_read_ptr;
+    uint32_t write_ptr = W_SYS->audio_write;
+    uint32_t read_ptr = W_SYS->audio_read;
     uint32_t size = W_SYS->audio_size;
 
     uint32_t free_space;
@@ -43,7 +43,7 @@ void wupdate() {
         phase += 440.0f / SAMPLE_RATE;
         if (phase > 1.0f) phase -= 1.0f;
     }
-    W_SYS->audio_write_ptr = (write_ptr + to_write) % size;
+    W_SYS->audio_write = (write_ptr + to_write) % size;
 
     // Slow visual feedback: color changes every 30 frames (~0.5s)
     frame_count++;

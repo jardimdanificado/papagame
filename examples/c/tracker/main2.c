@@ -34,8 +34,8 @@ typedef struct {
     uint32_t bpp;
     uint32_t scale;
     uint32_t audio_size;
-    uint32_t audio_write_ptr;
-    uint32_t audio_read_ptr;
+    uint32_t audio_write;
+    uint32_t audio_read;
     uint32_t audio_sample_rate, audio_bpp, audio_channels;
     uint32_t signal_count;
     uint32_t gamepad_buttons;
@@ -504,8 +504,8 @@ static void seq_advance_row() {
 static int audio_gen_sample_pos = 0; // tracks fractional sample position within row
 
 static void fill_audio() {
-    uint32_t r = _sys->audio_read_ptr;
-    uint32_t w = _sys->audio_write_ptr;
+    uint32_t r = _sys->audio_read;
+    uint32_t w = _sys->audio_write;
     uint32_t size = _sys->audio_size;
 
     int avail_bytes = (r > w) ? (int)(r - w - 2) : (int)(size - w + r - 2);
@@ -550,7 +550,7 @@ static void fill_audio() {
         out[1] = samp;
         w = (w + 4) % size;
     }
-    _sys->audio_write_ptr = w;
+    _sys->audio_write = w;
 }
 
 // ---- UI layout ----

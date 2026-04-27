@@ -25,7 +25,7 @@ extern uint32_t get_ticks();
 typedef struct {
     char     message[128];
     uint32_t width, height, bpp, scale;
-    uint32_t audio_size, audio_write_ptr, audio_read_ptr;
+    uint32_t audio_size, audio_write, audio_read;
     uint32_t audio_sample_rate, audio_bpp, audio_channels;
     uint32_t signal_count;
     uint32_t gamepad_buttons;
@@ -311,8 +311,8 @@ static void fill_audio() {
     uint8_t* audio_buf = mem + 512 + (_sys->width * _sys->height * 2);
     int16_t* samples = (int16_t*)audio_buf;
 
-    uint32_t r = _sys->audio_read_ptr;
-    uint32_t w = _sys->audio_write_ptr;
+    uint32_t r = _sys->audio_read;
+    uint32_t w = _sys->audio_write;
     uint32_t size = _sys->audio_size;
 
     int avail = (r > w) ? (r - w - 1) : (size - w + r - 1);
@@ -338,7 +338,7 @@ static void fill_audio() {
         out[0] = s16;
         out[1] = s16;
     }
-    _sys->audio_write_ptr = (w + to_write * 4) % size;
+    _sys->audio_write = (w + to_write * 4) % size;
 }
 
 // ---- Drawing helpers ----

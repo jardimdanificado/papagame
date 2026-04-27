@@ -1,5 +1,5 @@
-#ifndef WAGNOSTD_H
-#define WAGNOSTD_H
+#ifndef WAGNOSTIC_H
+#define WAGNOSTIC_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -18,12 +18,12 @@ typedef struct {
     uint32_t bpp;               // Offset 136
     uint32_t scale;              // Offset 140
     uint32_t audio_size;         // Offset 144
-    uint32_t audio_write_ptr;    // Offset 148
-    uint32_t audio_read_ptr;     // Offset 152
+    uint32_t audio_write;        // Offset 148
+    uint32_t audio_read;         // Offset 152
     uint32_t audio_sample_rate;  // Offset 156
     uint32_t audio_bpp;          // Offset 160
     uint32_t audio_channels;     // Offset 164
-    uint32_t signal_count;       // Offset 168 (The Hardware Signal Buffer size)
+    uint32_t ticks;              // Offset 168: Monotonic milliseconds (Host -> ROM)
     
     uint32_t gamepad_buttons;    // Offset 172
     int32_t  joystick_lx, joystick_ly, joystick_rx, joystick_ry; // Offset 176
@@ -33,21 +33,23 @@ typedef struct {
     int32_t  mouse_y;            // Offset 452
     uint32_t mouse_buttons;      // Offset 456
     int32_t  mouse_wheel;        // Offset 460
-    uint8_t  reserved[48];       // Offset 464
+    
+    uint8_t  signals[4];         // Offset 464: The 4 Hardware Signals
+    uint8_t  reserved[44];       // Offset 468 - 511
 } Wagnostic_System;
 #pragma pack(pop)
 
 // Pointer to System Config (Mapped at address 0)
 #define W_SYS ((volatile Wagnostic_System*)0)
 
-// Helper Macros
-#define W_SIGNALS ((volatile uint8_t*)WAGNOSTIC_HEADER_SIZE)
-#define W_FB_PTR  ((void*)(WAGNOSTIC_HEADER_SIZE + W_SYS->signal_count))
+// Helper Macros - VRAM starts ALWAYS at 512
+#define W_SIGNALS (W_SYS->signals)
+#define W_FB_PTR  ((void*)WAGNOSTIC_HEADER_SIZE)
 
 // Dynamic Audio Pointer calculation
 static inline void* w_audio_ptr() {
     uint32_t fb_size = W_SYS->width * W_SYS->height * (W_SYS->bpp / 8);
-    return (void*)(WAGNOSTIC_HEADER_SIZE + W_SYS->signal_count + fb_size);
+    return (void*)(WAGNOSTIC_HEADER_SIZE + fb_size);
 }
 
 // Signals Opcodes
@@ -77,12 +79,11 @@ static inline void* w_audio_ptr() {
 #define W_BTN_R2     (1 << 13)
 
 // Convenience setup
-static inline void w_setup(const char* title, int w, int h, int bpp, int scale, int signals) {
+static inline void w_setup(const char* title, int w, int h, int bpp, int scale, int signals_unused) {
     W_SYS->width = w;
     W_SYS->height = h;
     W_SYS->bpp = bpp;
     W_SYS->scale = scale;
-    W_SYS->signal_count = signals;
     
     // Set title
     if (title) {
@@ -92,7 +93,7 @@ static inline void w_setup(const char* title, int w, int h, int bpp, int scale, 
             i++;
         }
         ((char*)W_SYS->message)[i] = '\0';
-        if (signals > 1) W_SIGNALS[1] = W_SIG_UPDATE_TITLE;
+        W_SIGNALS[1] = W_SIG_UPDATE_TITLE;
     }
 }
 

@@ -11,37 +11,10 @@
 //    Esc          = clear selection
 // ============================================================
 
-typedef unsigned char  uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int   uint32_t;
-typedef          int   int32_t;
-typedef          short int16_t;
+#include "wagnostic.h"
 
-
-extern uint32_t get_ticks();
-
-// ---- System struct ----
-#pragma pack(push, 1)
-typedef struct {
-    char     message[128];
-    uint32_t width, height, bpp, scale;
-    uint32_t audio_size, audio_write_ptr, audio_read_ptr;
-    uint32_t audio_sample_rate, audio_bpp, audio_channels;
-    uint32_t signal_count;
-    uint32_t gamepad_buttons;
-    int32_t  joystick_lx, joystick_ly, joystick_rx, joystick_ry;
-    uint8_t  keys[256];
-    int32_t  mouse_x, mouse_y;
-    uint32_t mouse_buttons;
-    int32_t  mouse_wheel;
-    uint8_t  reserved[48];
-} SystemConfig;
-#pragma pack(pop)
-
-#define _sys ((volatile SystemConfig*)0)
-
-
-#define _sig ((volatile uint8_t*)512)
+#define _sys W_SYS
+#define _sig W_SIGNALS
 static uint16_t* _fb;
 
 // SDL scancodes we care about
@@ -319,8 +292,8 @@ static void fill_audio() {
     uint8_t* mem = (uint8_t*)0;
     uint8_t* audio_buf = mem + 512 + (_sys->width * _sys->height * 2);
 
-    uint32_t r = _sys->audio_read_ptr;
-    uint32_t w = _sys->audio_write_ptr;
+    uint32_t r = _sys->audio_read;
+    uint32_t w = _sys->audio_write;
     uint32_t size = _sys->audio_size;
 
     int avail = (r > w) ? (int)(r - w - 1) : (int)(size - w + r - 1);
@@ -350,7 +323,7 @@ static void fill_audio() {
         out[0] = s16;
         out[1] = s16;
     }
-    _sys->audio_write_ptr = (w + (uint32_t)to_write * 4) % size;
+    _sys->audio_write = (w + (uint32_t)to_write * 4) % size;
 }
 
 // ---- Drawing helpers ----
@@ -817,7 +790,7 @@ static void handle_input() {
                 voices[ch].env_vol = 0.0f;
             }
             // Drain the ring buffer so SDL stops playing stale audio
-            _sys->audio_read_ptr = _sys->audio_write_ptr;
+            _sys->audio_read = _sys->audio_write;
         }
     }
 
@@ -897,17 +870,16 @@ void winit() {
     _sys->height = 240;
     _sys->bpp = 16;
     _sys->scale = 3;
-    _sys->signal_count = 1;
+    // Signals are fixed now.
     _sys->audio_size = AUDIO_SIZE;
     _sys->audio_sample_rate = SAMPLE_RATE;
     _sys->audio_bpp = 2;
     _sys->audio_channels = 2;
-    _sys->signal_count = 4;
-    _fb = (uint16_t*)(512 + _sys->signal_count);
+    _fb = (uint16_t*)(512);
     const char* t = "Chiputnik - Chiptune Tracker";
     for (int i = 0; i < 127 && t[i]; i++) ((char*)_sys->message)[i] = t[i];
     _sig[1] = 3; // UPDATE_TITLE signal
     
     init_data();
-    last_ticks = get_ticks();
+    last_ticks = W_SYS->ticks;
 }

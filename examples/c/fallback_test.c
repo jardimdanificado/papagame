@@ -1,6 +1,5 @@
 #include "wagnostic.h"
 
-extern uint32_t get_ticks();
 
 // Sem winit! O Host deve aplicar os defaults: 320x240, 8bpp, scale 1.
 __attribute__((visibility("default")))
@@ -9,7 +8,7 @@ void wupdate() {
     static uint32_t last_tick = 0;
     static uint8_t color = 0;
     
-    uint32_t now = get_ticks();
+    uint32_t now = W_SYS->ticks;
     if (now - last_tick > 1000) {
         color += 32; // Muda a cor levemente a cada 1 segundo
         last_tick = now;

@@ -190,7 +190,7 @@ jobs:
           mkdir dist_pkg
           cp wagnostic dist_pkg/
           cp README.md dist_pkg/
-          tar -czf "wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.tar.gz" -C dist_pkg .
+          tar -czf "wagnostic${{ inputs.version }}-${{ matrix.archive }}.tar.gz" -C dist_pkg .
 
       - name: Package (Linux x86)
         if: matrix.target == 'linux-x86'
@@ -198,7 +198,7 @@ jobs:
           mkdir dist_pkg
           cp wagnostic dist_pkg/
           cp README.md dist_pkg/
-          tar -czf "wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.tar.gz" -C dist_pkg .
+          tar -czf "wagnostic${{ inputs.version }}-${{ matrix.archive }}.tar.gz" -C dist_pkg .
 
       - name: Package (Windows MinGW x64)
         if: matrix.target == 'windows-mingw'
@@ -209,7 +209,7 @@ jobs:
           cp /mingw64/bin/SDL2.dll dist_pkg/
           cp README.md dist_pkg/
           powershell -NoProfile -Command \
-            "Compress-Archive -Path dist_pkg\* -DestinationPath wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.zip -Force"
+            "Compress-Archive -Path dist_pkg\* -DestinationPath wagnostic${{ inputs.version }}-${{ matrix.archive }}.zip -Force"
 
       - name: Package (Windows MinGW x86)
         if: matrix.target == 'windows-mingw32'
@@ -220,7 +220,7 @@ jobs:
           cp /mingw32/bin/SDL2.dll dist_pkg/
           cp README.md dist_pkg/
           powershell -NoProfile -Command \
-            "Compress-Archive -Path dist_pkg\* -DestinationPath wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.zip -Force"
+            "Compress-Archive -Path dist_pkg\* -DestinationPath wagnostic${{ inputs.version }}-${{ matrix.archive }}.zip -Force"
 
       - name: Package (Windows MSVC x64)
         if: matrix.target == 'windows-msvc'
@@ -234,7 +234,7 @@ jobs:
           if (Test-Path $glew) { Copy-Item $glew dist_pkg/ }
           Copy-Item README.md dist_pkg/
           Compress-Archive -Path dist_pkg/* `
-            -DestinationPath "wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.zip" -Force
+            -DestinationPath "wagnostic${{ inputs.version }}-${{ matrix.archive }}.zip" -Force
 
       - name: Package (Windows MSVC x86)
         if: matrix.target == 'windows-msvc32'
@@ -248,7 +248,7 @@ jobs:
           if (Test-Path $glew) { Copy-Item $glew dist_pkg/ }
           Copy-Item README.md dist_pkg/
           Compress-Archive -Path dist_pkg/* `
-            -DestinationPath "wagnostic-v${{ inputs.version }}-${{ matrix.archive }}.zip" -Force
+            -DestinationPath "wagnostic${{ inputs.version }}-${{ matrix.archive }}.zip" -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -286,13 +286,13 @@ jobs:
           mkdir -p examples_pkg/examples
           cp examples/*.wasm examples_pkg/examples/
           cd examples_pkg
-          zip -r "../wagnostic-v${{ inputs.version }}-examples.zip" examples/
+          zip -r "../wagnostic${{ inputs.version }}-examples.zip" examples/
 
       - name: Upload examples artifact
         uses: actions/upload-artifact@v4
         with:
           name: wagnostic-examples
-          path: wagnostic-v${{ inputs.version }}-examples.zip
+          path: wagnostic${{ inputs.version }}-examples.zip
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
@@ -312,7 +312,7 @@ jobs:
       - name: Create tag if requested
         if: inputs.create_tag
         run: |
-          tag="v${{ inputs.version }}"
+          tag="${{ inputs.version }}"
           if git rev-parse "$tag" >/dev/null 2>&1; then
             echo "Tag $tag already exists"
           else
@@ -330,8 +330,8 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ inputs.version }}
-          name: v${{ inputs.version }}
-          body: "Wagnostic v${{ inputs.version }}"
+          tag_name: ${{ inputs.version }}
+          name: ${{ inputs.version }}
+          body: "Wagnostic ${{ inputs.version }}"
           prerelease: ${{ inputs.prerelease }}
           files: artifacts/**/*
